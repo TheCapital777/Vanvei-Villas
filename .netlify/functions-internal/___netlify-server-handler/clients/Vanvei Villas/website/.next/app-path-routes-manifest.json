@@ -1,0 +1,12 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/apartments/[slug]/page": "/apartments/[slug]",
+  "/api/payments/callback/route": "/api/payments/callback",
+  "/auth/callback/route": "/auth/callback",
+  "/auth/login/page": "/auth/login",
+  "/auth/signup/page": "/auth/signup",
+  "/booking/[bookingId]/page": "/booking/[bookingId]",
+  "/favicon.ico/route": "/favicon.ico",
+  "/page": "/"
+}

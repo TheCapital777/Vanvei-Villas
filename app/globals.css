@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-serif: var(--font-playfair);
+  --color-gold: #b37212;
+  --color-gold-dark: #8f5b0e;
+}
+
+body {
+  background: #0a0a0a;
+  color: #f5f5f5;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ─── Ken Burns (Hero background slow zoom) ─── */
+@keyframes kenBurns {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.08); }
+}
+.animate-ken-burns {
+  animation: kenBurns 25s ease-in-out infinite alternate;
+}
+
+/* ─── Glow Pulse (Ambient light) ─── */
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.08; }
+  50% { opacity: 0.18; }
+}
+.animate-glow-pulse {
+  animation: glowPulse 8s ease-in-out infinite;
+}
+
+/* ─── Golden Sweep (Light sweep over text) ─── */
+@keyframes goldenSweep {
+  0%, 65% { transform: translateX(-100%) skewX(-15deg); }
+  85% { transform: translateX(200%) skewX(-15deg); }
+  100% { transform: translateX(200%) skewX(-15deg); }
+}
+.golden-sweep {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(179, 114, 18, 0.06) 40%,
+    rgba(179, 114, 18, 0.15) 50%,
+    rgba(179, 114, 18, 0.06) 60%,
+    transparent 100%
+  );
+  animation: goldenSweep 8s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+  mix-blend-mode: screen;
+}
+
+/* ─── Footer Gradient Shift ─── */
+@keyframes footerGradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.animate-footer-gradient {
+  background: linear-gradient(135deg, #050505, #0d0a05, #080508, #050505);
+  background-size: 400% 400%;
+  animation: footerGradient 20s ease infinite;
+}
+
+/* ─── Elegant CTA Button ─── */
+.btn-elegant {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.btn-elegant::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--color-gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+  z-index: 0;
+}
+.btn-elegant:hover::before {
+  transform: scaleX(1);
+}
+.btn-elegant:hover {
+  box-shadow: 0 0 30px rgba(179, 114, 18, 0.25);
+  color: #000;
+}
+.btn-elegant > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── 3D Floating Logo ─── */
+.logo-3d {
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(179, 114, 18, 0.08);
+  transform: perspective(600px) rotateX(2deg) rotateY(-2deg);
+  transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.logo-3d:hover {
+  transform: perspective(600px) rotateX(0deg) rotateY(0deg) scale(1.05);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.6),
+    0 16px 40px rgba(0, 0, 0, 0.3),
+    0 0 30px rgba(179, 114, 18, 0.12);
+}
+
+/* ─── Accessibility: Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
