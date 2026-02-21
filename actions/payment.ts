@@ -113,6 +113,17 @@ export async function initiateMobilePayment(input: MNOPaymentInput) {
         })
         .eq("id", payment.id);
 
+      // Stamp payment reference + method on booking row for fast single-row reads
+      // payment_status stays 'unpaid' until callback confirms
+      await supabase
+        .from("bookings")
+        .update({
+          payment_reference: externalId,
+          payment_method: input.provider,
+          payment_status: "unpaid",
+        })
+        .eq("id", input.bookingId);
+
       return {
         success: true,
         paymentId: payment.id,
@@ -240,6 +251,17 @@ export async function initiateBankPayment(input: BankPaymentInput) {
           status: "pending",
         })
         .eq("id", payment.id);
+
+      // Stamp payment reference + method on booking row for fast single-row reads
+      // payment_status stays 'unpaid' until callback confirms
+      await supabase
+        .from("bookings")
+        .update({
+          payment_reference: externalId,
+          payment_method: input.provider,
+          payment_status: "unpaid",
+        })
+        .eq("id", input.bookingId);
 
       return {
         success: true,

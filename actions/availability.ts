@@ -43,10 +43,18 @@ export async function getMonthAvailability(
     return { bookedDates: [], blockedDates: [] };
   }
 
-  // Fetch bookings that overlap this month
+  // 30-minute expiry cutoff for pending+unpaid bookings
+  // Matches the same rule in the is_available() RPC (Migration 007)
+  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+  // Fetch bookings that overlap this month AND should block availability:
+  //   - confirmed bookings always block
+  //   - pending + paid bookings block
+  //   - pending + unpaid bookings block ONLY if created within last 30 min
+  //   - cancelled bookings never block
   const { data: bookings } = await supabase
     .from("bookings")
-    .select("check_in, check_out")
+    .select("check_in, check_out, status, payment_status, created_at")
     .eq("apartment_id", apartment.id)
     .neq("status", "cancelled")
     .lt("check_in", monthEnd)
@@ -60,10 +68,18 @@ export async function getMonthAvailability(
     .lt("start_date", monthEnd)
     .gt("end_date", monthStart);
 
-  // Convert ranges to individual dates
+  // Convert ranges to individual dates — skip expired pending+unpaid bookings
   const bookedDates: string[] = [];
   if (bookings) {
     for (const b of bookings) {
+      // Skip pending+unpaid bookings older than 30 minutes (expired locks)
+      if (
+        b.status === "pending" &&
+        (b.payment_status === "unpaid" || b.payment_status === null) &&
+        b.created_at < thirtyMinutesAgo
+      ) {
+        continue;
+      }
       bookedDates.push(...getDateRange(b.check_in, b.check_out));
     }
   }

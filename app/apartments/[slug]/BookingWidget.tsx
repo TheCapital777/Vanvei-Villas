@@ -145,6 +145,12 @@ export default function BookingWidget({
       });
 
       if (result.success && result.paymentId) {
+        // Forward-compat: if AzamPay returns a hosted checkout URL, redirect there
+        const anyResult = result as Record<string, unknown>;
+        if (anyResult.payment_url) {
+          window.location.href = anyResult.payment_url as string;
+          return;
+        }
         setPaymentId(result.paymentId);
         setPaymentProvider(provider);
         setPaymentMessage(result.message || "Check your phone for the payment prompt.");
@@ -173,6 +179,12 @@ export default function BookingWidget({
       });
 
       if (result.success && result.paymentId) {
+        // Forward-compat: if AzamPay returns a hosted checkout URL, redirect there
+        const anyResult = result as Record<string, unknown>;
+        if (anyResult.payment_url) {
+          window.location.href = anyResult.payment_url as string;
+          return;
+        }
         setPaymentId(result.paymentId);
         setPaymentProvider(provider);
         setPaymentMessage(result.message || "Processing your bank payment...");
