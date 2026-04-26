@@ -26,7 +26,8 @@ export default function AmbientParticles() {
     if (!ctx) return;
 
     const isMobile = window.matchMedia("(max-width: 768px)").matches;
-    const particleCount = isMobile ? 8 : 20;
+    if (isMobile) return; // skip particles entirely on mobile — saves constant GPU usage
+    const particleCount = 15;
 
     const resize = () => {
       canvas.width = canvas.offsetWidth * window.devicePixelRatio;
@@ -47,8 +48,15 @@ export default function AmbientParticles() {
 
     let animId: number;
     let frame = 0;
+    let lastTime = 0;
+    const FPS = 30;
+    const interval = 1000 / FPS;
 
-    const draw = () => {
+    const draw = (timestamp: number) => {
+      animId = requestAnimationFrame(draw);
+      if (timestamp - lastTime < interval) return; // throttle to 30fps
+      lastTime = timestamp;
+
       const w = canvas.offsetWidth;
       const h = canvas.offsetHeight;
 
@@ -70,10 +78,9 @@ export default function AmbientParticles() {
       });
 
       frame++;
-      animId = requestAnimationFrame(draw);
     };
 
-    draw();
+    animId = requestAnimationFrame(draw);
 
     window.addEventListener("resize", resize);
     return () => {

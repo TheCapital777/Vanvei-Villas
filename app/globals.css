@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-serif: var(--font-playfair);
-  --color-gold: #b37212;
-  --color-gold-dark: #8f5b0e;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --color-gold: #c8912a;
+  --color-gold-dark: #a0711e;
 }
 
 body {
@@ -111,6 +111,10 @@ html {
     0 16px 40px rgba(0, 0, 0, 0.3),
     0 0 30px rgba(179, 114, 18, 0.12);
 }
+
+/* ─── Hide scrollbar (mobile feature strip) ─── */
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* ─── Accessibility: Reduced Motion ─── */
 @media (prefers-reduced-motion: reduce) {

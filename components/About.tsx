@@ -37,10 +37,10 @@ export default function About() {
               A New Standard of Living in Dar es Salaam
             </h2>
             <p className="text-white/50 leading-relaxed mb-4">
-              Vanvei Villas is a premium apartment brand located in Tabata
+              Vanvei Villas is a premium villa brand located in Tabata
               Kinyerezi, one of Dar es Salaam&apos;s most connected and
               fast-growing neighborhoods. We offer modern, fully-furnished
-              apartments designed for comfort, style, and convenience.
+              villas designed for comfort, style, and convenience.
             </p>
             <p className="text-white/50 leading-relaxed mb-8">
               Whether you&apos;re visiting Tanzania for business, leisure, or an
@@ -116,7 +116,7 @@ export default function About() {
             label="Average Rating"
             duration={2000}
           />
-          <CounterNumber end={3} label="Apartment Types" duration={1500} />
+          <CounterNumber end={3} label="Villa Types" duration={1500} />
         </motion.div>
       </div>
     </section>

@@ -42,3 +42,9 @@ next-env.d.ts
 
 # Local Netlify folder
 .netlify
+
+# Claude Code
+.claude/
+
+# Large video assets (exceed GitHub 100MB limit — store elsewhere)
+public/videos/

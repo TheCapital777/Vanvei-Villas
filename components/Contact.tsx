@@ -93,8 +93,9 @@ export default function Contact() {
                   </svg>
                 </div>
                 <div>
-                  <p className="font-semibold text-white">Phone</p>
-                  <p className="text-white/50 text-sm">+255 XXX XXX XXX</p>
+                  <p className="font-semibold text-white">Phone / WhatsApp</p>
+                  <p className="text-white/50 text-sm">+255 710 739 543</p>
+                  <p className="text-white/50 text-sm">+255 754 274 616</p>
                 </div>
               </motion.div>
 
@@ -116,7 +117,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <p className="font-semibold text-white">Email</p>
-                  <p className="text-white/50 text-sm">info@vanveivillas.com</p>
+                  <p className="text-white/50 text-sm">info@vanvei.com</p>
                 </div>
               </motion.div>
             </motion.div>

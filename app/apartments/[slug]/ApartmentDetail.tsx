@@ -11,6 +11,8 @@ import {
   fadeUpChild,
 } from "@/hooks/animationConfig";
 import BookingWidget from "./BookingWidget";
+import PhotoGallery from "@/components/ui/PhotoGallery";
+import { formatPrice } from "@/lib/utils/booking";
 import type { APARTMENTS } from "@/lib/constants/apartments";
 
 type ApartmentData = (typeof APARTMENTS)[number];
@@ -38,50 +40,53 @@ export default function ApartmentDetail({
 }) {
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
-      {/* Hero banner */}
-      <div className="relative h-[40vh] md:h-[50vh] overflow-hidden">
-        <div
-          className={`absolute inset-0 bg-gradient-to-br ${apartment.gradient}`}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-black/50" />
-
-        {/* Back button */}
-        <div className="relative z-10 max-w-7xl mx-auto px-6 pt-24">
-          <Link
-            href="/#apartments"
-            className="inline-flex items-center gap-2 text-white/50 hover:text-white transition-colors duration-300 text-sm"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Apartments
-          </Link>
-        </div>
-
-        {/* Title overlay */}
-        <div className="absolute bottom-0 left-0 right-0 z-10">
-          <div className="max-w-7xl mx-auto px-6 pb-8">
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeUpVariant}
-            >
-              <p className="text-[var(--color-gold)] text-sm font-bold tracking-widest uppercase mb-2">
-                {apartment.beds} {apartment.beds === 1 ? "Bedroom" : "Bedrooms"} &middot; Up to {apartment.guests} Guests
-              </p>
-              <h1 className="text-4xl md:text-6xl font-black text-white">
-                {apartment.name}
-              </h1>
-            </motion.div>
-          </div>
-        </div>
+      {/* Back button */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 pt-24 pb-4">
+        <Link
+          href="/#apartments"
+          className="inline-flex items-center gap-2 text-white/50 hover:text-white transition-colors duration-300 text-sm"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Villas
+        </Link>
       </div>
+
+      {/* Title */}
+      <div className="max-w-7xl mx-auto px-6 pb-4">
+        <motion.div initial="hidden" animate="visible" variants={fadeUpVariant}>
+          <p className="text-[var(--color-gold)] text-sm font-bold tracking-widest uppercase mb-2">
+            {apartment.beds} {apartment.beds === 1 ? "Bedroom" : "Bedrooms"} &middot; Up to {apartment.guests} Guests
+          </p>
+          <h1 className="text-4xl md:text-6xl font-black text-white">
+            {apartment.name}
+          </h1>
+        </motion.div>
+      </div>
+
+      {/* Photo Gallery */}
+      <PhotoGallery images={apartment.images} name={apartment.name} />
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-6 py-16">
         <div className="grid lg:grid-cols-3 gap-12">
+
+          {/* Booking widget — shown FIRST on mobile, sticky on desktop */}
+          <motion.div
+            id="booking"
+            className="lg:col-span-1 lg:order-2 scroll-mt-24"
+            initial="hidden"
+            animate="visible"
+            variants={fadeRightVariant}
+          >
+            <div className="lg:sticky lg:top-24">
+              <BookingWidget apartment={apartment} />
+            </div>
+          </motion.div>
+
           {/* Left: Details */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 lg:order-1">
             <motion.div
               initial="hidden"
               animate="visible"
@@ -90,7 +95,7 @@ export default function ApartmentDetail({
               {/* Description */}
               <div className="mb-12">
                 <h2 className="text-2xl font-bold text-white mb-4">
-                  About This Apartment
+                  About This Villa
                 </h2>
                 <p className="text-white/50 leading-relaxed text-lg">
                   {apartment.description}
@@ -140,7 +145,7 @@ export default function ApartmentDetail({
               {/* Quick facts */}
               <div className="grid grid-cols-3 gap-6 py-8 border-t border-b border-white/10">
                 <div className="text-center">
-                  <p className="text-3xl font-black text-white">${apartment.price}</p>
+                  <p className="text-3xl font-black text-white">{formatPrice(apartment.price)}</p>
                   <p className="text-white/50 text-sm mt-1">per night</p>
                 </div>
                 <div className="text-center">
@@ -155,17 +160,6 @@ export default function ApartmentDetail({
             </motion.div>
           </div>
 
-          {/* Right: Booking Widget (sticky) */}
-          <motion.div
-            className="lg:col-span-1"
-            initial="hidden"
-            animate="visible"
-            variants={fadeRightVariant}
-          >
-            <div className="lg:sticky lg:top-24">
-              <BookingWidget apartment={apartment} />
-            </div>
-          </motion.div>
         </div>
       </div>
     </div>

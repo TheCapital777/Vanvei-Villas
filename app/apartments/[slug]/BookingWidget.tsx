@@ -1,433 +1,287 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/components/ui/Toast";
-import DateRangePicker from "@/components/booking/DateRangePicker";
-import GuestSelector from "@/components/booking/GuestSelector";
-import BookingSummary from "@/components/booking/BookingSummary";
-import AuthModal from "@/components/auth/AuthModal";
-import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import PaymentMethodSelector from "@/components/payment/PaymentMethodSelector";
-import MobilePaymentForm from "@/components/payment/MobilePaymentForm";
-import BankPaymentForm from "@/components/payment/BankPaymentForm";
-import PaymentStatusTracker from "@/components/payment/PaymentStatusTracker";
-import { createBooking } from "@/actions/booking";
-import { initiateMobilePayment, initiateBankPayment } from "@/actions/payment";
+import { QRCodeSVG } from "qrcode.react";
 import { formatPrice } from "@/lib/utils/booking";
 import type { APARTMENTS } from "@/lib/constants/apartments";
-import type { PaymentMethod, MNOProvider, BankProvider } from "@/lib/types/database";
+
+const LIPA_NUMBER = "15798558";
+const LIPA_NAME = "ESTARMILY KASSIM URASSA";
 
 type ApartmentData = (typeof APARTMENTS)[number];
 
-// Booking flow steps
-type BookingStep = "dates" | "details" | "payment" | "processing";
+const WHATSAPP_NUMBERS = [
+  { label: "Line 1", number: "255710739543" },
+  { label: "Line 2", number: "255754274616" },
+];
 
-export default function BookingWidget({
-  apartment,
-}: {
-  apartment: ApartmentData;
-}) {
-  const router = useRouter();
-  const { isAuthenticated, user, profile } = useAuth();
-  const { showToast } = useToast();
+const WA_ICON = "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z";
 
-  // Step tracking
-  const [step, setStep] = useState<BookingStep>("dates");
+function LipaCopyField() {
+  const [copied, setCopied] = useState(false);
 
-  // Booking state
-  const [checkIn, setCheckIn] = useState<string | null>(null);
-  const [checkOut, setCheckOut] = useState<string | null>(null);
-  const [numGuests, setNumGuests] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-
-  // Guest info
-  const [guestName, setGuestName] = useState("");
-  const [guestEmail, setGuestEmail] = useState("");
-  const [guestPhone, setGuestPhone] = useState("");
-  const [specialRequests, setSpecialRequests] = useState("");
-  const [showGuestForm, setShowGuestForm] = useState(false);
-
-  // Booking result (after creation)
-  const [bookingId, setBookingId] = useState<string | null>(null);
-
-  // Payment state
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [paymentId, setPaymentId] = useState<string | null>(null);
-  const [paymentProvider, setPaymentProvider] = useState<string>("");
-  const [paymentMessage, setPaymentMessage] = useState("");
-  const [isPaymentSubmitting, setIsPaymentSubmitting] = useState(false);
-
-  // Availability (populated from Supabase)
-  const bookedDates = new Set<string>();
-  const blockedDates = new Set<string>();
-
-  // Calculate total
-  const nights =
-    checkIn && checkOut
-      ? Math.round(
-          (new Date(checkOut).getTime() - new Date(checkIn).getTime()) /
-            (1000 * 60 * 60 * 24)
-        )
-      : 0;
-  const totalPrice = nights * apartment.price;
-
-  const handleDateChange = useCallback(
-    (start: string | null, end: string | null) => {
-      setCheckIn(start);
-      setCheckOut(end);
-      if (start && end) {
-        setShowGuestForm(true);
-        if (profile?.full_name) setGuestName(profile.full_name);
-        if (user?.email) setGuestEmail(user.email);
-        if (profile?.phone) setGuestPhone(profile.phone);
-      } else {
-        setShowGuestForm(false);
-      }
-    },
-    [profile, user]
-  );
-
-  // ─── Step 1: Create booking, then move to payment ───
-  const handleBookNow = async () => {
-    if (!checkIn || !checkOut) return;
-
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return;
-    }
-
-    if (!guestName || !guestEmail) {
-      showToast("error", "Please fill in your name and email.");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const result = await createBooking({
-        apartmentSlug: apartment.slug,
-        checkIn,
-        checkOut,
-        numGuests,
-        guestName,
-        guestEmail,
-        guestPhone: guestPhone || undefined,
-        specialRequests: specialRequests || undefined,
-      });
-
-      if (result.success && result.bookingId) {
-        setBookingId(result.bookingId);
-        setStep("payment");
-        showToast("success", "Booking created! Now complete payment.");
-      } else {
-        showToast("error", result.error || "Booking failed. Please try again.");
-      }
-    } catch {
-      showToast("error", "Something went wrong. Please try again.");
-    }
-
-    setIsSubmitting(false);
+  const copy = () => {
+    navigator.clipboard.writeText(LIPA_NUMBER).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
-
-  // ─── Step 2a: Handle mobile money payment ───
-  const handleMobilePayment = async (phone: string, provider: MNOProvider) => {
-    if (!bookingId) return;
-    setIsPaymentSubmitting(true);
-
-    try {
-      const result = await initiateMobilePayment({
-        bookingId,
-        phoneNumber: phone,
-        provider,
-      });
-
-      if (result.success && result.paymentId) {
-        // Forward-compat: if AzamPay returns a hosted checkout URL, redirect there
-        const anyResult = result as Record<string, unknown>;
-        if (anyResult.payment_url) {
-          window.location.href = anyResult.payment_url as string;
-          return;
-        }
-        setPaymentId(result.paymentId);
-        setPaymentProvider(provider);
-        setPaymentMessage(result.message || "Check your phone for the payment prompt.");
-        setStep("processing");
-      } else {
-        showToast("error", result.error || "Payment failed.");
-      }
-    } catch {
-      showToast("error", "Payment service error. Please try again.");
-    }
-
-    setIsPaymentSubmitting(false);
-  };
-
-  // ─── Step 2b: Handle bank payment ───
-  const handleBankPayment = async (account: string, provider: BankProvider, otp: string) => {
-    if (!bookingId) return;
-    setIsPaymentSubmitting(true);
-
-    try {
-      const result = await initiateBankPayment({
-        bookingId,
-        accountNumber: account,
-        provider,
-        otp,
-      });
-
-      if (result.success && result.paymentId) {
-        // Forward-compat: if AzamPay returns a hosted checkout URL, redirect there
-        const anyResult = result as Record<string, unknown>;
-        if (anyResult.payment_url) {
-          window.location.href = anyResult.payment_url as string;
-          return;
-        }
-        setPaymentId(result.paymentId);
-        setPaymentProvider(provider);
-        setPaymentMessage(result.message || "Processing your bank payment...");
-        setStep("processing");
-      } else {
-        showToast("error", result.error || "Payment failed.");
-      }
-    } catch {
-      showToast("error", "Payment service error. Please try again.");
-    }
-
-    setIsPaymentSubmitting(false);
-  };
-
-  const inputClasses =
-    "w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]/50 focus:border-transparent transition-all duration-300 text-sm";
 
   return (
-    <>
-      <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm overflow-hidden">
-        {/* Header */}
-        <div className="p-6 border-b border-white/10">
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white">
-              {formatPrice(apartment.price)}
-            </span>
-            <span className="text-white/40 text-sm">/ night</span>
-          </div>
-          <p className="text-white/30 text-xs mt-1">Minimum 2 nights</p>
+    <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+      <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between">
+        <span className="text-[10px] text-white/30 uppercase tracking-widest font-bold">LIPA Number</span>
+        <span className="text-[10px] text-white/30">{LIPA_NAME}</span>
+      </div>
+      <div className="flex items-center justify-between px-4 py-3">
+        <span className="text-white font-black text-xl tracking-widest">{LIPA_NUMBER}</span>
+        <button
+          onClick={copy}
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all duration-300"
+          style={copied
+            ? { borderColor: "#22c55e", color: "#22c55e" }
+            : { borderColor: "rgba(200,145,42,0.4)", color: "#c8912a" }
+          }
+        >
+          {copied ? (
+            <>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+              Copied!
+            </>
+          ) : (
+            <>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Copy
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function BookingWidget({ apartment }: { apartment: ApartmentData }) {
+  const [checkIn, setCheckIn]     = useState("");
+  const [checkOut, setCheckOut]   = useState("");
+  const [numGuests, setNumGuests] = useState(1);
+  const [showLipa, setShowLipa]   = useState(false);
+
+  const nights =
+    checkIn && checkOut
+      ? Math.max(0, Math.round(
+          (new Date(checkOut).getTime() - new Date(checkIn).getTime()) /
+            (1000 * 60 * 60 * 24)
+        ))
+      : 0;
+
+  const totalPrice = nights * apartment.price;
+  const ready = checkIn && checkOut && nights >= 2;
+
+  const formatDate = (d: string) =>
+    new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+  const whatsappMessage = useCallback(() =>
+    encodeURIComponent(
+      `Hi Vanvei Villas! I'd like to book *${apartment.name}*.\n\n` +
+      `Check-in: ${checkIn ? formatDate(checkIn) : "—"}\n` +
+      `Check-out: ${checkOut ? formatDate(checkOut) : "—"}\n` +
+      `Guests: ${numGuests}\n` +
+      `Total: ${formatPrice(totalPrice)} TZS\n\n` +
+      `I'll send payment confirmation shortly.`
+    ),
+  [apartment.name, checkIn, checkOut, numGuests, totalPrice]);
+
+  const today = new Date().toISOString().split("T")[0];
+
+  const inputClass = "w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]/50 focus:border-transparent transition-all duration-300 text-sm [color-scheme:dark]";
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm overflow-hidden">
+
+      {/* Price header */}
+      <div className="p-6 border-b border-white/10">
+        <div className="flex items-baseline gap-2">
+          <span className="text-3xl font-black text-white">{formatPrice(apartment.price)}</span>
+          <span className="text-white/40 text-sm">TZS / night</span>
         </div>
+        <p className="text-white/30 text-xs mt-1">Minimum 2 nights</p>
+      </div>
 
-        {/* ── STEP: Processing (payment status tracker) ── */}
-        {step === "processing" && paymentId && bookingId && (
-          <div className="p-6">
-            <PaymentStatusTracker
-              paymentId={paymentId}
-              bookingId={bookingId}
-              provider={paymentProvider}
-              message={paymentMessage}
+      {/* Dates */}
+      <div className="p-6 border-b border-white/10 space-y-3">
+        <p className="text-sm font-medium text-white/70">Select Dates</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-white/40 mb-1">Check-in</label>
+            <input
+              type="date"
+              value={checkIn}
+              min={today}
+              onChange={(e) => { setCheckIn(e.target.value); setShowLipa(false); }}
+              className={inputClass}
             />
           </div>
-        )}
-
-        {/* ── STEP: Payment method selection ── */}
-        {step === "payment" && (
-          <div className="p-6 space-y-6">
-            {/* Step header */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setStep("dates")}
-                className="text-white/40 hover:text-white/70 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <div>
-                <h3 className="text-white font-bold text-sm">Complete Payment</h3>
-                <p className="text-white/40 text-xs">Choose how you want to pay</p>
-              </div>
-            </div>
-
-            {/* Booking summary mini */}
-            <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">{apartment.name}</span>
-                <span className="text-white/50">{nights} night{nights !== 1 ? "s" : ""}</span>
-              </div>
-              <div className="flex justify-between mt-1">
-                <span className="text-white/50 text-xs">Total</span>
-                <span className="text-[var(--color-gold)] font-bold">
-                  {formatPrice(totalPrice)}
-                </span>
-              </div>
-            </div>
-
-            {/* Payment method selector */}
-            <PaymentMethodSelector
-              selected={paymentMethod}
-              onSelect={setPaymentMethod}
+          <div>
+            <label className="block text-xs text-white/40 mb-1">Check-out</label>
+            <input
+              type="date"
+              value={checkOut}
+              min={checkIn || today}
+              onChange={(e) => { setCheckOut(e.target.value); setShowLipa(false); }}
+              className={inputClass}
             />
-
-            {/* Payment form based on method */}
-            {paymentMethod === "mno" && (
-              <MobilePaymentForm
-                amount={totalPrice}
-                onSubmit={handleMobilePayment}
-                isSubmitting={isPaymentSubmitting}
-              />
-            )}
-
-            {paymentMethod === "bank" && (
-              <BankPaymentForm
-                amount={totalPrice}
-                onSubmit={handleBankPayment}
-                isSubmitting={isPaymentSubmitting}
-              />
-            )}
-
-            {/* Skip payment option */}
-            <button
-              onClick={() => {
-                if (bookingId) router.push(`/booking/${bookingId}`);
-              }}
-              className="w-full text-center text-xs text-white/30 hover:text-white/50 transition-colors py-2"
-            >
-              Pay later (booking will remain pending)
-            </button>
           </div>
-        )}
-
-        {/* ── STEP: Date selection & Guest details ── */}
-        {(step === "dates" || step === "details") && (
-          <>
-            {/* Calendar */}
-            <div className="p-6 border-b border-white/10">
-              <p className="text-sm font-medium text-white/70 mb-3">
-                Select Dates
-              </p>
-              <DateRangePicker
-                bookedDates={bookedDates}
-                blockedDates={blockedDates}
-                minNights={2}
-                checkIn={checkIn}
-                checkOut={checkOut}
-                onDateChange={handleDateChange}
-              />
-            </div>
-
-            {/* Guest selector + form */}
-            {checkIn && checkOut && (
-              <div className="p-6 border-b border-white/10 space-y-4">
-                <GuestSelector
-                  value={numGuests}
-                  maxGuests={apartment.guests}
-                  onChange={setNumGuests}
-                />
-
-                {showGuestForm && (
-                  <div className="space-y-3 pt-2">
-                    <div>
-                      <label className="block text-xs font-medium text-white/50 mb-1">
-                        Full Name *
-                      </label>
-                      <input
-                        type="text"
-                        value={guestName}
-                        onChange={(e) => setGuestName(e.target.value)}
-                        placeholder="Your full name"
-                        required
-                        className={inputClasses}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-white/50 mb-1">
-                        Email *
-                      </label>
-                      <input
-                        type="email"
-                        value={guestEmail}
-                        onChange={(e) => setGuestEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        required
-                        className={inputClasses}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-white/50 mb-1">
-                        Phone (optional)
-                      </label>
-                      <input
-                        type="tel"
-                        value={guestPhone}
-                        onChange={(e) => setGuestPhone(e.target.value)}
-                        placeholder="+255 XXX XXX XXX"
-                        className={inputClasses}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-white/50 mb-1">
-                        Special Requests (optional)
-                      </label>
-                      <textarea
-                        value={specialRequests}
-                        onChange={(e) => setSpecialRequests(e.target.value)}
-                        placeholder="Any special requests..."
-                        rows={3}
-                        className={`${inputClasses} resize-none`}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Summary */}
-            {checkIn && checkOut && (
-              <div className="p-6 border-b border-white/10">
-                <BookingSummary
-                  apartmentName={apartment.name}
-                  checkIn={checkIn}
-                  checkOut={checkOut}
-                  pricePerNight={apartment.price}
-                  numGuests={numGuests}
-                />
-              </div>
-            )}
-
-            {/* CTA */}
-            <div className="p-6">
-              {checkIn && checkOut ? (
-                <button
-                  onClick={handleBookNow}
-                  disabled={isSubmitting}
-                  className="w-full bg-[var(--color-gold)] text-black font-bold py-3.5 rounded-full hover:bg-[var(--color-gold-dark)] transition-colors duration-300 flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <LoadingSpinner size="sm" />
-                  ) : isAuthenticated ? (
-                    "Book & Pay"
-                  ) : (
-                    "Sign In to Book"
-                  )}
-                </button>
-              ) : (
-                <p className="text-center text-white/30 text-sm">
-                  Select your dates to see pricing
-                </p>
-              )}
-            </div>
-          </>
+        </div>
+        {checkIn && checkOut && nights < 2 && (
+          <p className="text-xs text-red-400">Minimum stay is 2 nights</p>
         )}
       </div>
 
-      {/* Auth Modal */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onSuccess={() => {
-          setShowAuthModal(false);
-          showToast("success", "Signed in! You can now complete your booking.");
-        }}
-      />
-    </>
+      {/* Guests */}
+      {ready && (
+        <div className="p-6 border-b border-white/10">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-white/70">Guests</p>
+              <p className="text-xs text-white/30 mt-0.5">Max {apartment.guests}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setNumGuests(Math.max(1, numGuests - 1))}
+                className="w-8 h-8 rounded-full border border-white/20 text-white hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors text-lg leading-none flex items-center justify-center"
+              >−</button>
+              <span className="text-white font-bold w-4 text-center">{numGuests}</span>
+              <button
+                onClick={() => setNumGuests(Math.min(apartment.guests, numGuests + 1))}
+                className="w-8 h-8 rounded-full border border-white/20 text-white hover:border-[var(--color-gold)] hover:text-[var(--color-gold)] transition-colors text-lg leading-none flex items-center justify-center"
+              >+</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Summary */}
+      {ready && (
+        <div className="px-6 py-4 border-b border-white/10 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-white/50">{formatPrice(apartment.price)} × {nights} night{nights !== 1 ? "s" : ""}</span>
+            <span className="text-white">{formatPrice(totalPrice)}</span>
+          </div>
+          <div className="flex justify-between text-sm font-bold pt-1 border-t border-white/10">
+            <span className="text-white">Total</span>
+            <span className="text-[var(--color-gold)]">{formatPrice(totalPrice)} TZS</span>
+          </div>
+        </div>
+      )}
+
+      {/* CTA */}
+      <div className="p-6 space-y-3">
+        {ready ? (
+          <>
+            <button
+              onClick={() => setShowLipa(true)}
+              className="w-full bg-[var(--color-gold)] text-black font-bold py-3.5 rounded-full hover:bg-[var(--color-gold-dark)] transition-colors duration-300"
+            >
+              Book Now
+            </button>
+            <div className="grid grid-cols-2 gap-2">
+              {WHATSAPP_NUMBERS.map(({ label, number }) => (
+                <a key={number} href={`https://wa.me/${number}?text=${whatsappMessage()}`} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 border border-white/10 text-white/60 hover:text-white hover:border-white/30 font-medium py-3 rounded-full transition-colors duration-300 text-xs">
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d={WA_ICON}/></svg>
+                  WhatsApp {label}
+                </a>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="text-center text-white/30 text-sm py-2">Select your dates to continue</p>
+        )}
+      </div>
+
+      {/* LIPA section */}
+      {showLipa && ready && (
+        <div className="border-t border-white/10 p-6 space-y-5">
+
+          <div className="flex items-center justify-between">
+            <h3 className="text-white font-bold text-sm">Complete Payment</h3>
+            <button onClick={() => setShowLipa(false)} className="text-white/30 hover:text-white/70 transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Gold-framed QR card */}
+          <div className="relative mx-auto w-fit">
+            {/* Outer gold glow */}
+            <div className="absolute -inset-[3px] rounded-2xl" style={{
+              background: "linear-gradient(135deg, #c8912a, #f0c060, #7a5518, #c8912a)",
+              boxShadow: "0 0 30px rgba(200,145,42,0.4), 0 8px 32px rgba(0,0,0,0.5)",
+            }} />
+            <div className="relative bg-white rounded-2xl p-5 flex flex-col items-center gap-3">
+              {/* Corner accents */}
+              <div className="absolute top-2.5 left-2.5 w-4 h-4 border-t-2 border-l-2 rounded-tl" style={{borderColor:"#c8912a"}} />
+              <div className="absolute top-2.5 right-2.5 w-4 h-4 border-t-2 border-r-2 rounded-tr" style={{borderColor:"#c8912a"}} />
+              <div className="absolute bottom-2.5 left-2.5 w-4 h-4 border-b-2 border-l-2 rounded-bl" style={{borderColor:"#c8912a"}} />
+              <div className="absolute bottom-2.5 right-2.5 w-4 h-4 border-b-2 border-r-2 rounded-br" style={{borderColor:"#c8912a"}} />
+
+              <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-[#c8912a]">Lipa Kwa Simu</p>
+
+              <QRCodeSVG
+                value={LIPA_NUMBER}
+                size={160}
+                fgColor="#0a0a0a"
+                bgColor="#ffffff"
+                level="M"
+              />
+
+              <p className="text-[10px] text-neutral-400 font-medium">Scan to pay · M-Pesa / Tigo / Airtel</p>
+            </div>
+          </div>
+
+          {/* LIPA number copy field */}
+          <LipaCopyField />
+
+          {/* Amount due */}
+          <div className="rounded-xl bg-[var(--color-gold)]/10 border border-[var(--color-gold)]/20 px-4 py-3 flex items-center justify-between">
+            <span className="text-white/60 text-sm">Amount to send</span>
+            <span className="text-[var(--color-gold)] font-black text-lg">{formatPrice(totalPrice)} TZS</span>
+          </div>
+
+          {/* Steps */}
+          <ol className="space-y-2 text-sm text-white/50">
+            {[
+              "Open M-Pesa, Tigo Pesa or Airtel Money",
+              "Scan the QR code or enter LIPA number",
+              `Send exactly ${formatPrice(totalPrice)} TZS`,
+              "WhatsApp us your receipt to confirm",
+            ].map((step, i) => (
+              <li key={i} className="flex gap-3 items-start">
+                <span className="w-5 h-5 rounded-full bg-[var(--color-gold)]/20 text-[var(--color-gold)] text-[10px] flex items-center justify-center flex-shrink-0 font-bold mt-0.5">{i + 1}</span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+
+          {/* WhatsApp buttons */}
+          <div className="space-y-2">
+            <p className="text-xs text-white/30 text-center">Send your receipt to confirm booking</p>
+            {WHATSAPP_NUMBERS.map(({ label, number }) => (
+              <a key={number} href={`https://wa.me/${number}?text=${whatsappMessage()}`} target="_blank" rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white font-bold py-3 rounded-full hover:bg-[#1ebe5d] transition-colors duration-300 text-sm">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d={WA_ICON}/></svg>
+                Send Receipt — {label}
+              </a>
+            ))}
+          </div>
+
+        </div>
+      )}
+    </div>
   );
 }
