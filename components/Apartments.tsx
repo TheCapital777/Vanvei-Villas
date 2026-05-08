@@ -9,10 +9,10 @@ import {
   staggerContainer,
   fadeUpChild,
 } from "@/hooks/animationConfig";
-import { APARTMENTS } from "@/lib/constants/apartments";
+import { APARTMENTS, type Apartment } from "@/lib/constants/apartments";
 import { formatPrice } from "@/lib/utils/booking";
 
-function ApartmentCard({ apt }: { apt: (typeof APARTMENTS)[number] }) {
+function ApartmentCard({ apt }: { apt: Apartment }) {
   const [imgIndex, setImgIndex] = useState(0);
   const [hovered, setHovered] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);

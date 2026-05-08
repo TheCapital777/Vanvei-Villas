@@ -3,12 +3,12 @@
 import { useState, useCallback } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { formatPrice } from "@/lib/utils/booking";
-import type { APARTMENTS } from "@/lib/constants/apartments";
+import type { Apartment } from "@/lib/constants/apartments";
 
 const LIPA_NUMBER = "15798558";
 const LIPA_NAME = "ESTARMILY KASSIM URASSA";
 
-type ApartmentData = (typeof APARTMENTS)[number];
+type ApartmentData = Apartment;
 
 const WHATSAPP_NUMBERS = [
   { label: "Line 1", number: "255710739543" },

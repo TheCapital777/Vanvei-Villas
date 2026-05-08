@@ -3,10 +3,10 @@
 import { useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "motion/react";
-import { APARTMENTS } from "@/lib/constants/apartments";
+import { APARTMENTS, type Apartment } from "@/lib/constants/apartments";
 import BookingWidget from "@/app/apartments/[slug]/BookingWidget";
 
-type ApartmentData = (typeof APARTMENTS)[number];
+type ApartmentData = Apartment;
 
 interface BookingModalProps {
   apartment: ApartmentData | null;
@@ -14,6 +14,11 @@ interface BookingModalProps {
 }
 
 export default function BookingModal({ apartment, onClose }: BookingModalProps) {
+  // Pre-compute thumbnail for TypeScript narrowing
+  const thumb: string | null = apartment
+    ? (apartment.cover ?? apartment.images[0] ?? null)
+    : null;
+
   // Lock scroll when open
   useEffect(() => {
     if (apartment) {
@@ -67,11 +72,11 @@ export default function BookingModal({ apartment, onClose }: BookingModalProps) 
               {/* Header */}
               <div className="flex items-center gap-4 px-5 py-4 border-b border-white/10 flex-shrink-0">
                 {/* Villa thumbnail */}
-                {(apartment.cover ?? (apartment.images as readonly string[])[0]) && (
+                {thumb && (
                   <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 border border-white/10">
                     <Image
-                      src={(apartment.cover ?? (apartment.images as readonly string[])[0]) as string}
-                      alt={apartment.name}
+                      src={thumb}
+                      alt={apartment?.name ?? ""}
                       fill
                       className="object-cover"
                       sizes="56px"

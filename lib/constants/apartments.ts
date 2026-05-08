@@ -99,3 +99,16 @@ export const APARTMENTS = [
 ] as const;
 
 export type ApartmentSlug = (typeof APARTMENTS)[number]["slug"];
+
+export type Apartment = {
+  slug: string;
+  name: string;
+  description: string;
+  price: number;
+  beds: number;
+  guests: number;
+  gradient: string;
+  cover: string | null;
+  images: readonly string[];
+  amenities: readonly string[];
+};
